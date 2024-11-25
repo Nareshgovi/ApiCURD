@@ -1,8 +1,5 @@
-﻿using finaltry.Data;
-using finaltry.models.entity;
+﻿using finaltry.models.entity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore; // Adjust namespace to match your project structure
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace n.Controllers
@@ -11,26 +8,24 @@ namespace n.Controllers
     [ApiController]
     public class StudentController : ControllerBase
     {
-        private readonly AppDBcontext _context;
+        private readonly IStudentService _service;
 
-        public StudentController(AppDBcontext context)
+        public StudentController(IStudentService service)
         {
-            _context = context;
+            _service = service;
         }
 
-        // GET: api/Student
         [HttpGet]
         public async Task<IActionResult> GetStudents()
         {
-            var students = await _context.students.ToListAsync();
+            var students = await _service.GetAllStudentsAsync();
             return Ok(students);
         }
 
-        // GET: api/Student/5
         [HttpGet("{id}")]
         public async Task<IActionResult> GetStudent(int id)
         {
-            var student = await _context.students.FindAsync(id);
+            var student = await _service.GetStudentByIdAsync(id);
             if (student == null)
             {
                 return NotFound();
@@ -38,7 +33,6 @@ namespace n.Controllers
             return Ok(student);
         }
 
-        // POST: api/Student
         [HttpPost]
         public async Task<IActionResult> CreateStudent([FromBody] Student student)
         {
@@ -47,76 +41,40 @@ namespace n.Controllers
                 return BadRequest("Student object is null.");
             }
 
-            try
-            {
-                _context.students.Add(student);
-                await _context.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetStudent), new { id = student.StudentId }, student);
-            }
-            catch (DbUpdateException dbEx)
-            {
-                // Log database-related errors
-                Console.WriteLine($"Database error: {dbEx.Message}");
-                return StatusCode(500, "Database error occurred.");
-            }
-            catch (Exception ex)
-            {
-                // Log general errors
-                Console.WriteLine($"Error: {ex.Message}");
-                return StatusCode(500, "Internal server error.");
-            }
+            await _service.AddStudentAsync(student);
+            return CreatedAtAction(nameof(GetStudent), new { id = student.StudentId }, student);
         }
 
-
-
-        // PUT: api/Student/5
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] Student student)
         {
-            if (id != student.StudentId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(student).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _service.UpdateStudentAsync(id, student);
+                return NoContent();
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!StudentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // DELETE: api/Student/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteStudent(int id)
-        {
-            var student = await _context.students.FindAsync(id);
-            if (student == null)
+            catch (KeyNotFoundException)
             {
                 return NotFound();
             }
-
-            _context.students.Remove(student);
-            await _context.SaveChangesAsync();
-            return NoContent();
+            catch (ArgumentException)
+            {
+                return BadRequest();
+            }
         }
 
-        private bool StudentExists(int id)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStudent(int id)
         {
-            return _context.students.Any(e => e.StudentId == id);
+            try
+            {
+                await _service.DeleteStudentAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
         }
     }
 }
